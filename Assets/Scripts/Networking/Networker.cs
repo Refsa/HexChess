@@ -1,3 +1,5 @@
+#define WEBSOCKET
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -175,7 +177,11 @@ public class Networker : MonoBehaviour
             Debug.LogWarning(e);
         }
 
+#if WEBSOCKET
+        server = new WebsocketNetworkServer(port);
+#else
         server = new StandaloneNetworkServer(port);
+#endif
 
         try
         {
@@ -269,7 +275,13 @@ public class Networker : MonoBehaviour
         this.port = port;
 
         Debug.Log($"Attempting to connect to {ip}:{port}.");
+
+#if WEBSOCKET
+        networkClient = new WebsocketNetworkClient(ip, port);
+#else
         networkClient = new StandaloneNetworkClient(ip, port);
+#endif
+
         try
         {
             networkClient.BeginConnect(ClientConnectCallback, this);

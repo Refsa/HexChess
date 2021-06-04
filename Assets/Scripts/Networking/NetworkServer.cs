@@ -4,7 +4,7 @@ using System;
 
 public abstract class NetworkServer : System.IDisposable
 {
-    int port;
+    protected int port;
 
     public NetworkServer(int port)
     {
