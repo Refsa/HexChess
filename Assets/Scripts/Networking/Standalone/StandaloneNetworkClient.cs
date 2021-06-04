@@ -58,6 +58,11 @@ public class StandaloneNetworkClient : NetworkClient
         return client.IP();
     }
 
+    public override void Close()
+    {
+        Dispose();
+    }
+
     public override void Dispose()
     {
         stream?.Close();

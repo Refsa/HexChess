@@ -32,6 +32,7 @@ public abstract class NetworkClient : System.IDisposable
     public abstract void Write(byte[] data, int offset, int length);
 
 
+    public abstract void Close();
     public abstract void Dispose();
 
     protected void MessageReceived(byte[] data, int length)

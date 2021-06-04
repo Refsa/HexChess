@@ -30,10 +30,8 @@ public class Networker : MonoBehaviour
     [ReadOnly, ShowInInspector] public Player host;
     [ReadOnly, ShowInInspector] public Player? player;
 
-    TcpListener server;
-
+    NetworkServer server;
     NetworkClient networkClient;
-    WebSocket websocket;
 
     const int messageMaxSize = 2048;
     public float pingDelay = 2f;
@@ -177,12 +175,12 @@ public class Networker : MonoBehaviour
             Debug.LogWarning(e);
         }
 
-        server = TcpListener.Create(port);
+        server = new StandaloneNetworkServer(port);
 
         try
         {
             server.Start();
-            server.BeginAcceptTcpClient(new AsyncCallback(AcceptClientCallback), server);
+            server.BeginAcceptTcpClient(AcceptClientCallback, server);
         }
         catch (Exception e)
         {
@@ -201,10 +199,10 @@ public class Networker : MonoBehaviour
     {
         try
         {
-            TcpClient incomingClient = server.EndAcceptTcpClient(ar);
+            NetworkClient incomingClient = server.EndAcceptTcpClient(ar);
             if (networkClient == null)
             {
-                networkClient = new StandaloneNetworkClient(incomingClient);
+                networkClient = incomingClient;
             }
             // In chess, there is only ever 2 players, (1 host, 1 player), so reject any connection trying to come in if the player slot is already full
             else
@@ -212,7 +210,7 @@ public class Networker : MonoBehaviour
                 incomingClient.Close();
                 try
                 {
-                    server.BeginAcceptTcpClient(new AsyncCallback(AcceptClientCallback), server);
+                    server.BeginAcceptTcpClient(AcceptClientCallback, server);
                 }
                 catch (Exception e)
                 {
@@ -255,7 +253,7 @@ public class Networker : MonoBehaviour
 
         try
         {
-            server.BeginAcceptTcpClient(new AsyncCallback(AcceptClientCallback), server);
+            server.BeginAcceptTcpClient(AcceptClientCallback, server);
         }
         catch (Exception e)
         {
