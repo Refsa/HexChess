@@ -247,9 +247,10 @@ public class Board : SerializedMonoBehaviour
         ? state 
         : turnHistory[turnHistory.Count - 1];
 
-    public void AdvanceTurn(BoardState newState, bool updateTime = true)
+    public void AdvanceTurn(BoardState newState, bool updateTime = true, bool surpressAudio = false)
     {
-        audioSource.PlayOneShot(moveClip);
+        if(!surpressAudio)
+            audioSource.PlayOneShot(moveClip);
 
         // IEnumerable<IPiece> checkingPieces = GetCheckingPieces(newState, newState.currentMove);
         Multiplayer multiplayer = GameObject.FindObjectOfType<Multiplayer>();
@@ -608,7 +609,7 @@ public class Board : SerializedMonoBehaviour
         // Update boardstate
         if(allPiecePositions.ContainsKey((piece.team, piece.piece)))
             allPiecePositions.Remove((piece.team, piece.piece));
-        else if(allPiecePositions.ContainsKey(targetLocation))
+        if(allPiecePositions.ContainsKey(targetLocation))
             allPiecePositions.Remove(targetLocation);
         allPiecePositions.Add((piece.team, piece.piece), targetLocation);
         currentState.allPiecePositions = allPiecePositions;
@@ -685,8 +686,7 @@ public class Board : SerializedMonoBehaviour
         // Replace the pawn with the chosen piece type
         // Worth noting: Even though the new IPiece is of a different type than Pawn,
         // we still use the PieceType.Pawn# (read from the pawn) to store it's position in the game state to maintain it's unique key
-        Board board = GameObject.FindObjectOfType<Board>();
-        Hex hex = board.GetHexIfInBounds(pawn.location);
+        Hex hex = GetHexIfInBounds(pawn.location);
 
         IPiece newPiece = Instantiate(piecePrefabs[(pawn.team, type)], hex.transform.position + Vector3.up, Quaternion.identity).GetComponent<IPiece>();
         newPiece.Init(pawn.team, pawn.piece, pawn.location);
