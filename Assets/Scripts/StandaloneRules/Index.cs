@@ -13,6 +13,8 @@ public struct Index
 
     public Index(int rank, char file)
     {
+        file = char.ToUpper(file);
+
         if (rank < 1 || rank > 10)
             throw new ArgumentOutOfRangeException(nameof(rank), "Rank must be between 1-10 inclusive");
         if (file < 'A' || file > 'I')

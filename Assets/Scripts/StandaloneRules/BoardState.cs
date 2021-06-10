@@ -17,6 +17,8 @@ public struct BoardState
     public Team checkmate;
     public float executedAtTime;
 
+    public Team CurrentMove => currentMove;
+
     public BoardState(BidirectionalDictionary<(Team, Piece), Index> allPiecePositions, Team currentMove, Team check, Team checkmate, float executedAtTime)
     {
         this.allPiecePositions = allPiecePositions;

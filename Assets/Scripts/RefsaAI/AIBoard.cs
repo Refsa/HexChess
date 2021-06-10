@@ -20,14 +20,14 @@ namespace RefsaAI
         public event System.Action<Game> OnGameOver;
 
         [SerializeField] List<PiecePrefab> piecePrefabs = new List<PiecePrefab>();
+        [SerializeField] List<Jail> jails = new List<Jail>();
 
         List<BoardState> turnHistory = new List<BoardState>();
-        List<Jail> jails = new List<Jail>();
         List<Promotion> promotions = new List<Promotion>();
         Dictionary<(Team, Piece), IPiece> activePieces = new Dictionary<(Team, Piece), IPiece>();
         List<List<Piece>> insufficientSets = new List<List<Piece>>();
         private BoardState? lastSetState = null;
-        List<List<Hex>> hexes = new List<List<Hex>>();
+        [Sirenix.OdinInspector.ShowInInspector] List<List<Hex>> hexes = new List<List<Hex>>();
 
         public Game game;
         public int turnsSincePawnMovedOrPieceTaken = 0;
@@ -35,9 +35,44 @@ namespace RefsaAI
 
         private void Awake()
         {
+            CollectHexes();
+
             LoadGame(GetDefaultGame(defaultBoardStateFileLoc));
         }
         private void Start() { }
+
+        void CollectHexes()
+        {
+            int wide = 0;
+            int narrow = -1;
+            int index = 0;
+            hexes.Add(new List<Hex>());
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Hex hex = transform.GetChild(i).GetComponent<Hex>();
+
+                if (narrow < 4)
+                {
+                    narrow++;
+                    if (narrow == 4)
+                    {
+                        hexes.Add(new List<Hex>());
+                        wide = 0;
+                    }
+                }
+                else if (wide < 5)
+                {
+                    wide++;
+                    if (wide == 5)
+                    {
+                        hexes.Add(new List<Hex>());
+                        narrow = 0;
+                    }
+                }
+
+                hexes.Last().Add(hex);
+            }
+        }
 
         public Game GetDefaultGame(string loc)
         {
@@ -211,18 +246,13 @@ namespace RefsaAI
         public void AdvanceTurn(BoardState newState, bool updateTime = true, bool surpressAudio = false)
         {
             // IEnumerable<IPiece> checkingPieces = GetCheckingPieces(newState, newState.currentMove);
-            Multiplayer multiplayer = GameObject.FindObjectOfType<Multiplayer>();
             float timestamp = Time.timeSinceLevelLoad + timeOffset;
             Team otherTeam = newState.currentMove == Team.White ? Team.Black : Team.White;
 
             if (updateTime)
                 newState.executedAtTime = timestamp;
 
-            if (multiplayer == null || multiplayer.gameParams.localTeam == newState.currentMove)
-                newState = ResetCheck(newState);
-            else
-                newState = ResetCheck(newState);
-
+            newState = ResetCheck(newState);
             newState = CheckForCheckAndMate(newState, otherTeam, newState.currentMove);
 
             // Handle potential checkmate
@@ -230,15 +260,7 @@ namespace RefsaAI
             {
                 newState.currentMove = otherTeam;
                 turnHistory.Add(newState);
-                OnNewTurn.Invoke(newState);
-
-                if (multiplayer)
-                {
-                    if (multiplayer.gameParams.localTeam == newState.checkmate)
-                        multiplayer.SendGameEnd(timestamp, MessageType.Checkmate);
-                    else
-                        return;
-                }
+                OnNewTurn?.Invoke(newState);
 
                 EndGame(
                     timestamp,
@@ -264,19 +286,11 @@ namespace RefsaAI
             // Handle potential stalemate
             if (isStalemate)
             {
-                if (multiplayer)
-                {
-                    if (multiplayer.gameParams.localTeam == otherTeam)
-                        multiplayer.SendGameEnd(timestamp, MessageType.Stalemate);
-                    else
-                        return;
-                }
-
                 newState.currentMove = otherTeam;
                 turnHistory.Add(newState);
 
                 Move move = BoardState.GetLastMove(turnHistory);
-                OnNewTurn.Invoke(newState);
+                OnNewTurn?.Invoke(newState);
 
                 EndGame(timestamp, GameEndType.Stalemate, Winner.None);
                 return;
@@ -300,7 +314,7 @@ namespace RefsaAI
                 turnHistory.Add(newState);
 
                 Move move = BoardState.GetLastMove(turnHistory);
-                OnNewTurn.Invoke(newState);
+                OnNewTurn?.Invoke(newState);
 
                 EndGame(timestamp, GameEndType.Stalemate, Winner.None);
                 return;
@@ -315,13 +329,7 @@ namespace RefsaAI
             {
                 turnHistory.Add(newState);
 
-                if (multiplayer != null)
-                {
-                    multiplayer.ClaimDraw();
-                    return;
-                }
-
-                OnNewTurn.Invoke(newState);
+                OnNewTurn?.Invoke(newState);
                 EndGame(timestamp, GameEndType.Draw, Winner.Draw);
                 return;
             }
@@ -330,7 +338,7 @@ namespace RefsaAI
 
             Move newMove = BoardState.GetLastMove(turnHistory);
 
-            OnNewTurn.Invoke(newState);
+            OnNewTurn?.Invoke(newState);
 
             // The game ends in a draw due to 50 move rule (50 turns of both teams playing with no captured piece, or moved pawn)
             if (newMove.capturedPiece.HasValue || newMove.lastPiece >= Piece.Pawn1)
@@ -343,6 +351,22 @@ namespace RefsaAI
                 EndGame(timestamp, GameEndType.Draw, Winner.Draw);
                 return;
             }
+        }
+
+        public BoardState? MovePiece(Index from, Index to, bool isQuery = false, bool includeBlocking = false)
+        {
+            BoardState currentState = turnHistory.Last();
+
+            if (currentState.TryGetPiece(from, out (Team occupyingTeam, Piece occupyingType) teamedPiece))
+            {
+                if (teamedPiece.occupyingTeam != currentState.currentMove) return null;
+
+                var state = MovePiece(activePieces[teamedPiece], to, currentState, isQuery, includeBlocking);
+                AdvanceTurn(state);
+                return state;
+            }
+
+            return null;
         }
 
         public BoardState MovePiece(IPiece piece, Index targetLocation, BoardState boardState, bool isQuery = false, bool includeBlocking = false)
@@ -531,7 +555,7 @@ namespace RefsaAI
             currentState.currentMove = Team.None;
             currentState.executedAtTime = timestamp;
             turnHistory.Add(currentState);
-            OnNewTurn.Invoke(currentState);
+            OnNewTurn?.Invoke(currentState);
 
             game = new Game(
                 turnHistory,
