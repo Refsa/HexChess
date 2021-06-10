@@ -43,7 +43,7 @@ public class Pawn : MonoBehaviour, IPiece
         
         // If the pawn reaches the other side of the board, it can Promote
         if(location.row == goal)
-            hex.board.QueryPromote(this, action);
+            hex.board?.QueryPromote(this, action);
     }
 
     private void Update() => MoveOverTime();

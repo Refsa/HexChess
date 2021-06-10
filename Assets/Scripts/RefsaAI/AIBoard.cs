@@ -27,7 +27,7 @@ namespace RefsaAI
         Dictionary<(Team, Piece), IPiece> activePieces = new Dictionary<(Team, Piece), IPiece>();
         List<List<Piece>> insufficientSets = new List<List<Piece>>();
         private BoardState? lastSetState = null;
-        [Sirenix.OdinInspector.ShowInInspector] List<List<Hex>> hexes = new List<List<Hex>>();
+        List<List<Hex>> hexes = new List<List<Hex>>();
 
         public Game game;
         public int turnsSincePawnMovedOrPieceTaken = 0;
@@ -37,7 +37,7 @@ namespace RefsaAI
         {
             CollectHexes();
 
-            LoadGame(GetDefaultGame(defaultBoardStateFileLoc));
+            // LoadGame(GetDefaultGame(defaultBoardStateFileLoc));
         }
         private void Start() { }
 
@@ -72,6 +72,11 @@ namespace RefsaAI
 
                 hexes.Last().Add(hex);
             }
+        }
+
+        public void ShowBoardState(in BoardState boardState)
+        {
+            SetBoardState(boardState);
         }
 
         public Game GetDefaultGame(string loc)
@@ -241,6 +246,11 @@ namespace RefsaAI
             }
 
             return piece;
+        }
+
+        public void CheckBoard(in BoardState state)
+        {
+
         }
 
         public void AdvanceTurn(BoardState newState, bool updateTime = true, bool surpressAudio = false)

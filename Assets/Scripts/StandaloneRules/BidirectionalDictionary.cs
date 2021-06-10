@@ -5,6 +5,37 @@ using System.Runtime.Serialization;
 using Sirenix.Serialization;
 using UnityEngine;
 
+public static class BidirectionalDictionaryPool<TKey, TValue>
+{
+    static Queue<BidirectionalDictionary<TKey, TValue>> pool;
+
+    static BidirectionalDictionaryPool()
+    {
+        pool = new Queue<BidirectionalDictionary<TKey, TValue>>();
+        Expand(16);
+    }
+
+    public static BidirectionalDictionary<TKey, TValue> Get()
+    {
+        if (pool.Count == 0) Expand(16);
+        return pool.Dequeue();
+    }
+
+    public static void Free(BidirectionalDictionary<TKey, TValue> dict)
+    {
+        dict.Clear();
+        pool.Enqueue(dict);
+    }
+
+    static void Expand(int by)
+    {
+        for (int i = 0; i < by; i++)
+        {
+            pool.Enqueue(new BidirectionalDictionary<TKey, TValue>());
+        }
+    }
+}
+
 public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IEnumerable<KeyValuePair<T, K>>, IEnumerable, IDictionary<T, K>, IReadOnlyCollection<KeyValuePair<T, K>>, IReadOnlyDictionary<T, K>, ICollection, IDictionary, IDeserializationCallback, ISerializable
 {
     private Dictionary<T, K> forwardDict;
@@ -29,8 +60,11 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     public BidirectionalDictionary<T, K> Clone()
     {
         Dictionary<T, K> newF = new Dictionary<T, K>(forwardDict);
-        Dictionary<K, T> newB = new Dictionary<K, T>(backwardsDict);        
-        return new BidirectionalDictionary<T, K>(newF, newB);
+        Dictionary<K, T> newB = new Dictionary<K, T>(backwardsDict);
+        var bidict = BidirectionalDictionaryPool<T, K>.Get();
+        bidict.forwardDict = newF;
+        bidict.backwardsDict = newB;
+        return bidict;
     }
 
     public void Deserialize(SerializationInfo info, StreamingContext context)
@@ -39,18 +73,22 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
         backwardsDict = (Dictionary<K, T>)info.GetValue("backwards", typeof(Dictionary<K, T>));
     }
 
-    public K this[T key] {
+    public K this[T key]
+    {
         get => forwardDict[key];
-        set {
+        set
+        {
             if (forwardDict.TryGetValue(key, out K oldValue))
                 backwardsDict.Remove(oldValue);
             forwardDict[key] = value;
             backwardsDict[value] = key;
         }
     }
-    public T this[K key] {
+    public T this[K key]
+    {
         get => backwardsDict[key];
-        set {
+        set
+        {
             if (backwardsDict.TryGetValue(key, out T oldValue))
                 forwardDict.Remove(oldValue);
             forwardDict[value] = key;
@@ -58,15 +96,18 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
         }
     }
 
-    public object this[object key] { get {
-        if(key is T) 
-            return forwardDict[(T)key];
-        else if(key is K)
-            return backwardsDict[(K)key];
-        else
-            return null;
-        } 
-        set {} 
+    public object this[object key]
+    {
+        get
+        {
+            if (key is T)
+                return forwardDict[(T)key];
+            else if (key is K)
+                return backwardsDict[(K)key];
+            else
+                return null;
+        }
+        set { }
     }
 
     public int Count => forwardDict.Count;
@@ -86,7 +127,7 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
 
     public void Add(T key, K value)
     {
-        if(!ContainsKey(key) && !ContainsKey(value))
+        if (!ContainsKey(key) && !ContainsKey(value))
         {
             forwardDict.Add(key, value);
             backwardsDict.Add(value, key);
@@ -99,9 +140,9 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     public void Add(KeyValuePair<K, T> item) => Add(item.Value, item.Key);
     public void Add(object key, object value)
     {
-        if(key is T && value is K)
+        if (key is T && value is K)
             Add((T)key, (K)value);
-        else if(key is K && value is T)
+        else if (key is K && value is T)
             Add((K)value, (T)key);
     }
 
@@ -109,7 +150,7 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     public bool Remove(KeyValuePair<K, T> item) => backwardsDict.Remove(item.Key) && forwardDict.Remove(item.Value);
     public bool Remove(T key, K val) => forwardDict.Remove(key) && backwardsDict.Remove(val);
     public bool Remove(K key, T val) => forwardDict.Remove(val) && backwardsDict.Remove(key);
-    public bool Remove(T key) 
+    public bool Remove(T key)
     {
         if (forwardDict.TryGetValue(key, out K val))
             return Remove(key, val);
@@ -125,9 +166,9 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     }
     public void Remove(object key)
     {
-        if(key is T)
+        if (key is T)
             Remove((T)key);
-        else if(key is K)
+        else if (key is K)
             Remove((K)key);
     }
 
@@ -144,9 +185,9 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
 
     public bool Contains(object key)
     {
-        if(key is T)
+        if (key is T)
             return ContainsKey((T)key);
-        else if(key is K)
+        else if (key is K)
             return ContainsKey((K)key);
         else
             return false;
@@ -158,7 +199,7 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     public void CopyTo(KeyValuePair<T, K>[] array, int arrayIndex) => throw new System.NotImplementedException();
     public void CopyTo(KeyValuePair<K, T>[] array, int arrayIndex) => throw new NotImplementedException();
     public void CopyTo(Array array, int index) => throw new NotImplementedException();
-    public void GetObjectData(SerializationInfo info, StreamingContext context) 
+    public void GetObjectData(SerializationInfo info, StreamingContext context)
     {
         info.AddValue("forward", forwardDict, typeof(Dictionary<T, K>));
         info.AddValue("backward", backwardsDict, typeof(Dictionary<K, T>));
@@ -167,7 +208,7 @@ public class BidirectionalDictionary<T, K> : ICollection<KeyValuePair<T, K>>, IE
     {
         return;
     }
-    
+
     public IEnumerator<KeyValuePair<T, K>> GetEnumerator() => forwardDict.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     IDictionaryEnumerator IDictionary.GetEnumerator() => forwardDict.GetEnumerator();

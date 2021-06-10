@@ -1,11 +1,13 @@
 #nullable enable
 
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using Newtonsoft.Json;
 
 public class BoardStateTests
 {
@@ -21,6 +23,16 @@ public class BoardStateTests
         }
 
         return new BoardState(allPiecePositions, Team.White, Team.None, Team.None, 0);
+    }
+
+    private static BoardState Deserialize(string json)
+    {
+        List<BoardState> history = new List<BoardState>();
+        
+        SerializeableGame game = JsonConvert.DeserializeObject<SerializeableGame>(json);
+        foreach((Team team, List<SerializedPiece> pieces, Team check, Team checkmate, float duration) in game.serializedBoards)
+            history.Add(BoardState.GetBoardStateFromDeserializedBoard(pieces, team, check, checkmate, duration));
+        return history.First();
     }
 
     #region IsChecking tests
@@ -53,6 +65,15 @@ public class BoardStateTests
 
         Assert.True(bs.IsChecking(Team.White, null));
         Assert.True(bs.IsChecking(Team.Black, null));
+    }
+
+    [Test]
+    public void DefaultBoardCheckTest()
+    {
+        var bs = Deserialize(((TextAsset)Resources.Load("DefaultBoardState", typeof(TextAsset))).text);
+
+        Assert.False(bs.IsChecking(Team.White, null));
+        Assert.False(bs.IsChecking(Team.Black, null));
     }
 
     [Test]

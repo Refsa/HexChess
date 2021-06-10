@@ -1,3 +1,16 @@
 {
-	"name": "StandaloneRules"
+    "name": "StandaloneRules",
+    "rootNamespace": "",
+    "references": [
+        "GUID:4c9c6a2adc1120244946d98a6011ae90"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

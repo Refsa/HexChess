@@ -1,24 +1,56 @@
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 
 namespace RefsaAI
 {
+    public enum BoardEval
+    {
+        Invalid = 0,
+        Regular,
+        InCheck
+    }
+
+    public struct BoardEvaluation
+    {
+        public BoardEval Evaluation;
+        public Index? Position;
+    }
+
     public class AIManager : MonoBehaviour
     {
-        AIBoard board;
+        BoardState defaultBoard;
 
-        void Awake()
+        VisualBoard visualBoard;
+
+        AIGame game;
+
+        void Start()
         {
-            board = GetComponent<AIBoard>();
-            StartCoroutine(TestMove());
+            visualBoard = GetComponent<VisualBoard>();
+
+            defaultBoard = Game.Deserialize(((TextAsset)Resources.Load("DefaultBoardState", typeof(TextAsset))).text).turnHistory.Last();
+
+            game = new AIGame(defaultBoard);
+            visualBoard.ShowBoardState(game.CurrentBoard);
+
+            StartCoroutine(SlowTick());
         }
 
-        IEnumerator TestMove()
+        IEnumerator SlowTick()
         {
-            yield return new WaitForSeconds(0.25f);
-            Debug.Assert(board.MovePiece(new Index(2, 'a'), new Index(3, 'a')) != null);
-            yield return new WaitForSeconds(0.25f);
-            Debug.Assert(board.MovePiece(new Index(3, 'a'), new Index(4, 'a')) == null);
+            while (true)
+            {
+                if (!game.Tick())
+                {
+                    Debug.Log("Checkmate!");
+                    game = new AIGame(defaultBoard);
+                }
+                visualBoard.ShowBoardState(game.CurrentBoard);
+                // yield return new WaitForSeconds(0.25f);
+                yield return null;
+                yield return null;
+            }
         }
     }
 }

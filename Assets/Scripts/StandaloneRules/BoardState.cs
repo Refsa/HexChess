@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using Extensions;
 
-public struct BoardState
+public struct BoardState : System.IDisposable
 {
     public Team currentMove;
     [FormerlySerializedAs("biDirPiecePositions")]
@@ -30,16 +30,16 @@ public struct BoardState
 
     public static Move GetLastMove(List<BoardState> history)
     {
-        if(history.Count > 1)
+        if (history.Count > 1)
         {
             BoardState lastState = history[history.Count - 2];
             BoardState nowState = history[history.Count - 1];
-            foreach(KeyValuePair<(Team team, Piece piece), Index> kvp in lastState.allPiecePositions)
+            foreach (KeyValuePair<(Team team, Piece piece), Index> kvp in lastState.allPiecePositions)
             {
-                if(!nowState.TryGetIndex(kvp.Key, out Index nowPos))
+                if (!nowState.TryGetIndex(kvp.Key, out Index nowPos))
                     continue;
 
-                if(kvp.Value == nowPos)
+                if (kvp.Value == nowPos)
                     continue;
 
                 (Team previousTeamAtLocation, Piece? previousPieceAtLocation) = lastState.allPiecePositions.Contains(nowPos)
@@ -47,7 +47,7 @@ public struct BoardState
                     : (Team.None, (Piece?)null);
 
                 Piece? capturedPiece = previousTeamAtLocation == kvp.Key.team ? null : previousPieceAtLocation;
-                if(kvp.Key.piece.IsPawn() && kvp.Value.GetLetter() != nowPos.GetLetter() && capturedPiece == null)
+                if (kvp.Key.piece.IsPawn() && kvp.Value.GetLetter() != nowPos.GetLetter() && capturedPiece == null)
                 {
                     // Pawns that move sideways are always attacks. If the new location was unoccupied, then did En Passant
                     Index? enemyLocation = nowPos.GetNeighborAt(kvp.Key.team == Team.White ? HexNeighborDirection.Down : HexNeighborDirection.Up);
@@ -65,23 +65,23 @@ public struct BoardState
                     defendedPiece: previousTeamAtLocation != kvp.Key.team ? null : previousPieceAtLocation,
                     duration: nowState.executedAtTime - lastState.executedAtTime
                 );
-                
+
             }
         }
         return new Move(0, Team.None, Piece.King, default(Index), default(Index));
     }
 
-    public readonly bool TryGetPiece(Index index, out (Team team, Piece piece) teamedPiece) => 
+    public readonly bool TryGetPiece(Index index, out (Team team, Piece piece) teamedPiece) =>
         allPiecePositions.TryGetValue(index, out teamedPiece);
-    public readonly bool TryGetIndex((Team team, Piece piece) teamedPiece, out Index index) => 
+    public readonly bool TryGetIndex((Team team, Piece piece) teamedPiece, out Index index) =>
         allPiecePositions.TryGetValue(teamedPiece, out index);
 
-    public static bool operator ==(BoardState a, BoardState b) => 
-        a.currentMove == b.currentMove 
-        && a.allPiecePositions.Count == b.allPiecePositions.Count 
+    public static bool operator ==(BoardState a, BoardState b) =>
+        a.currentMove == b.currentMove
+        && a.allPiecePositions.Count == b.allPiecePositions.Count
         && !a.allPiecePositions.Except(b.allPiecePositions).Any();
     public static bool operator !=(BoardState a, BoardState b) => !(a == b);
-    
+
     public override bool Equals(object obj) => base.Equals(obj);
     public override int GetHashCode() => base.GetHashCode();
     public override string ToString() => base.ToString();
@@ -126,9 +126,9 @@ public struct BoardState
             }
 
             IEnumerable<(Index, MoveType)> moves = MoveGenerator.GetAllPossibleMoves(kvp.Value, realPiece, checkForTeam, this);
-            foreach((Index hex, MoveType moveType) in moves)
+            foreach ((Index hex, MoveType moveType) in moves)
             {
-                if(moveType == MoveType.Attack && hex == otherKing)
+                if (moveType == MoveType.Attack && hex == otherKing)
                     return true;
             }
         }
@@ -227,17 +227,18 @@ public struct BoardState
     public List<SerializedPiece> GetSerializeable()
     {
         List<SerializedPiece> list = new List<SerializedPiece>();
-        foreach(KeyValuePair<(Team, Piece), Index> kvp in allPiecePositions)
+        foreach (KeyValuePair<(Team, Piece), Index> kvp in allPiecePositions)
         {
             (Team team, Piece piece) = kvp.Key;
-            list.Add(new SerializedPiece{t = team, p = piece, i = kvp.Value});
+            list.Add(new SerializedPiece { t = team, p = piece, i = kvp.Value });
         }
         return list;
     }
 
     public byte[] Serialize() =>
         Encoding.ASCII.GetBytes(
-            JsonConvert.SerializeObject(new SerializedBoard{
+            JsonConvert.SerializeObject(new SerializedBoard
+            {
                 pieces = GetSerializeable(),
                 currentMove = currentMove,
                 check = check,
@@ -250,22 +251,30 @@ public struct BoardState
     public static BoardState GetBoardStateFromDeserializedBoard(List<SerializedPiece> list, Team currentMove, Team check, Team checkmate, float executedAtTime)
     {
         BidirectionalDictionary<(Team, Piece), Index> newDict = new BidirectionalDictionary<(Team, Piece), Index>();
-        foreach(SerializedPiece tpl in list)
+        foreach (SerializedPiece tpl in list)
             newDict.Add((tpl.t, tpl.p), tpl.i);
 
-        return new BoardState{allPiecePositions = newDict, currentMove = currentMove, check = check, checkmate = checkmate, executedAtTime = executedAtTime};
+        return new BoardState { allPiecePositions = newDict, currentMove = currentMove, check = check, checkmate = checkmate, executedAtTime = executedAtTime };
+    }
+
+    public BoardState Clone()
+    {
+        var newPositions = allPiecePositions.Clone();
+        var clone = new BoardState(newPositions, currentMove, check, checkmate, executedAtTime);
+        return clone;
     }
 
     public static BoardState Deserialize(byte[] data)
     {
         string json = Encoding.ASCII.GetString(data);
         SerializedBoard boardstate = JsonConvert.DeserializeObject<SerializedBoard>(json);
-        
-        BidirectionalDictionary<(Team, Piece), Index> newDict = new BidirectionalDictionary<(Team, Piece), Index>();
-        foreach(SerializedPiece tpl in boardstate.pieces)
+
+        BidirectionalDictionary<(Team, Piece), Index> newDict = BidirectionalDictionaryPool<(Team, Piece), Index>.Get();
+        foreach (SerializedPiece tpl in boardstate.pieces)
             newDict.Add((tpl.t, tpl.p), tpl.i);
 
-        return new BoardState {
+        return new BoardState
+        {
             allPiecePositions = newDict,
             currentMove = boardstate.currentMove,
             check = boardstate.check,
@@ -273,20 +282,9 @@ public struct BoardState
             executedAtTime = boardstate.executedAtTime
         };
     }
-}
 
-[System.Serializable]
-public struct SerializedBoard {
-    public List<SerializedPiece> pieces;
-    public Team currentMove;
-    public Team check;
-    public Team checkmate;
-    public float executedAtTime;
-}
-
-[System.Serializable]
-public struct SerializedPiece {
-    public Team t;
-    public Piece p;
-    public Index i;
+    public void Dispose()
+    {
+        BidirectionalDictionaryPool<(Team, Piece), Index>.Free(allPiecePositions);
+    }
 }

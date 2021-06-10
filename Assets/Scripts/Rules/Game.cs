@@ -82,21 +82,3 @@ public struct SerializeableGame
         this.hasClock = hasClock;
     }
 }
-
-public enum GameEndType
-{
-    Pending = 0,
-    Checkmate = 1,
-    Surrender = 2,
-    Draw = 3,
-    Flagfall = 4,
-    Stalemate = 5
-}
-
-public enum Winner {
-    Pending = 0,
-    White = 1,
-    Black = 2,
-    Draw = 3,
-    None = 4
-}
